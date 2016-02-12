@@ -40,8 +40,8 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
         for child in root:
             ins_dic = root.attrib.keys()
             val_dic = root.attrib.values()
-            ins_str = u"INSERT INTO operations2can(" 
-            val_str = u' VALUES('
+            ins_str = u"INSERT INTO operations2can(tag," 
+            val_str = u' VALUES(' + u"'" + root.tag + u"',"
             if 'Device' == child.tag:
                 dev_keys = []
                 for k in child.attrib.iterkeys():
