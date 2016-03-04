@@ -6,7 +6,12 @@ CREATE OR REPLACE FUNCTION fntr_op2can_comission()
   RETURNS trigger AS
 $BODY$BEGIN
    NEW.Sum = NEW.Amount - ROUND(NEW.Amount * 0.0275, 2);
-   NEW.bill_no = (REGEXP_REPLACE(COALESCE(NEW.description,'0'), '[^0-9]+', '', 'g'))::INTEGER;
+   BEGIN
+      -- NEW.bill_no = (REGEXP_REPLACE(COALESCE(NEW.description,'0'), '[^0-9]+', '', 'g'))::INTEGER;
+      NEW.bill_no = (REGEXP_REPLACE(NEW.description, '[^0-9]+', '', 'g'))::INTEGER;
+   EXCEPTION WHEN OTHERS THEN
+      NEW.bill_no = NULL;
+   END;
    RETURN NEW;
 END;$BODY$
   LANGUAGE plpgsql VOLATILE
