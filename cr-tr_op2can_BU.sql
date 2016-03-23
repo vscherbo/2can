@@ -6,4 +6,5 @@ CREATE TRIGGER "tr_op2can_BIU"
   BEFORE INSERT OR UPDATE
   ON operations2can
   FOR EACH ROW
+  WHEN (NEW.status NOT IN ('Voided', E'Отменен'))
   EXECUTE PROCEDURE fntr_op2can_comission();
