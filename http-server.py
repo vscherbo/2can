@@ -9,7 +9,8 @@ import time
 import xml.etree.ElementTree as ET
 import psycopg2
 
-HOST_NAME = 'ct-apps01.arc.world' # !!!REMEMBER TO CHANGE THIS!!!
+# HOST_NAME = 'ct-apps01.arc.world' # !!!REMEMBER TO CHANGE THIS!!!
+HOST_NAME = '192.168.1.43' # !!!REMEMBER TO CHANGE THIS!!!
 PORT_NUMBER = 8123
 
 
