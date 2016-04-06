@@ -16,11 +16,14 @@ real_2can="""data=%ef%bb%bf%3cPayment+Id%3d%221672518%22+Amount%3d%2220.00%22+Cr
 #url_post = "http://217.150.43.11:8123/post"
 #url_post = "http://217.150.43.9:8123"
 
-url_post = "http://2can.kipspb.ru:8123/post"
+#url_post = "http://2can.kipspb.ru:8123/post"
+url_get = "http://ct-apps01.arc.world:8123/get"
+url_post = "http://ct-apps01.arc.world:8123/post"
 
 #r = requests.post(url_post, data = payment_xml)
 #r = requests.post(url_post, data = void_xml)
 r = requests.post(url_post, data = refund_xml.encode('utf-8'))
+#r = requests.get(url_get)
 
 print(r.status_code)
 
