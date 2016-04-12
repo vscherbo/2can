@@ -18,10 +18,10 @@ PORT_NUMBER = 8123
 class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
     pg_srv = 'vm-pg'
     def do_GET(s):
-        s.send_response(200)
+        s.send_response(404)
         s.send_header('content-type','text/html')
         s.end_headers()
-        s.wfile.write("hello !")
+        s.wfile.write("Page not found")
     def do_POST(s):
         """Respond to a POST request."""
         # Extract and print the contents of the POST
