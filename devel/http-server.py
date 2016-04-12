@@ -8,34 +8,48 @@ import urllib
 import time
 import xml.etree.ElementTree as ET
 import psycopg2
+import socket
+import logging
+import sys
+import codecs
 
 # HOST_NAME = 'ct-apps01.arc.world' # !!!REMEMBER TO CHANGE THIS!!!
-HOST_NAME = '192.168.1.43' # !!!REMEMBER TO CHANGE THIS!!!
+# HOST_NAME = '192.168.1.43' # !!!REMEMBER TO CHANGE THIS!!!
+HOST_NAME = socket.gethostname()
 PORT_NUMBER = 8123
 
+if HOST_NAME.find('ct-apps') > 0:
+   db_host = 'vm-pg'
+else:   
+   db_host = 'vm-pg-devel'
 
+glob_logname = '2can-httpd.log'
+glob_logfile = codecs.open(glob_logname, 'a', 'utf-8', buffering=0)
 
 class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
-    pg_srv = 'vm-pg'
-    def do_GET(s):
-        s.send_response(200)
-        s.send_header('content-type','text/html')
-        s.end_headers()
-        s.wfile.write("hello !")
-    def do_POST(s):
+    pg_srv = db_host
+    logfile = glob_logfile
+    # logfile = open('2can-httpd.log', 'a', 0)
+    # def __init__(self, logfilename):
+    #    self.logfile = open(logfilename, 'a', 0)
+    def do_GET(self):
+        self.send_response(404)
+        self.send_header('content-type','text/html')
+        self.end_headers()
+        self.wfile.write("page not found")
+    def do_POST(self):
         """Respond to a POST request."""
         # Extract and print the contents of the POST
-        length = int(s.headers['Content-Length'])
+        length = int(self.headers['Content-Length'])
         #post_data = u''
-        #post_data += s.rfile.read(length).decode('utf-8')
-        post_data = s.rfile.read(length)
+        #post_data += self.rfile.read(length).decode('utf-8')
+        post_data = self.rfile.read(length)
         post_data=urllib.unquote_plus(post_data).replace("data=", "")
-        print "post_data="
-        print post_data #.encode('utf-8')
+        self.log_message("post_data={}".format(post_data))
         #root = ET.fromstring(post_data.encode('utf-8'))
         root = ET.fromstring(post_data)
-        print u"tag=%s" % root.tag
-        print u"attrib=%s" % root.attrib
+        self.log_message("tag={}".format(root.tag))
+        self.log_message("attrtib={}".format(root.attrib))
  
 
         for child in root:
@@ -61,33 +75,47 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
             val_str += u');'
             sql_str = ins_str + val_str
             # print "sql_str=%s" % sql_str
-            con_str = "host='" + s.pg_srv + "' dbname='arc_energo' user='arc_energo'" # password='XXXX' - .pgpass
+            con_str = "host='" + self.pg_srv + "' dbname='arc_energo' user='arc_energo'" # password='XXXX' - .pgpass
             # print "con_str=%s" % con_str
             try:
                 con = psycopg2.connect(con_str)
-            except:
-                print "I am unable to connect to the database"
+            except BaseException, exc:
+                self.log_error(" Exception on connect={}".format(str(exc)))
+                self.log_message(" SQL to execute=R{}".format(sql_str))
 
             #TODO check return code
             cur = con.cursor()
             try:
                 cur.execute(sql_str)
-            except:
-                print "ERROR while INSERT"
+            except BaseException, exc:
+                self.log_error(" Exception on INSERT={}".format(str(exc)))
+                self.log_message(" SQL to execute={}".format(sql_str))
             con.commit()
         
-        s.send_response(200)
-        s.send_header("Content-type", "text/html")
-        s.end_headers()
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+    def log_message(self, a_str):
+        #t_args = tuple([a.decode('UTF-8') for a in args])
+        #t_args = repr(args).decode('utf-8')
+        #print "a_str=", a_str
+        # self.logfile.write("%s, %s - - [%s] %s\n" % 
+        self.logfile.write("{}, {} - - [{}] {}\n".format(self.address_string(), 
+            self.client_address[0],
+            self.log_date_time_string(), 
+            a_str )) 
+            #a_str.encode('utf-8') )) 
 
 if __name__ == '__main__':
+    # logging.basicConfig(filename='http-server.log', format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
+    logging.basicConfig(filename=glob_logname, format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
     server_class = BaseHTTPServer.HTTPServer
     httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
     # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
-    print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
+    logging.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
     try:
             httpd.serve_forever()
     except KeyboardInterrupt:
             pass
     httpd.server_close()
-    print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)
+    logging.info("Server Stops - %s:%s", HOST_NAME, PORT_NUMBER)
