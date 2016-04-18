@@ -21,7 +21,7 @@ PORT_NUMBER = 8123
 if HOST_NAME.find('ct-apps') > 0:
    db_host = 'vm-pg'
 else:   
-   db_host = 'vm-pg-devel'
+   db_host = 'vm-pg-devel1'
 
 glob_logname = '2can-httpd.log'
 glob_logfile = codecs.open(glob_logname, 'a', 'utf-8', buffering=0)
@@ -44,12 +44,12 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
         #post_data = u''
         #post_data += self.rfile.read(length).decode('utf-8')
         post_data = self.rfile.read(length)
-        post_data=urllib.unquote_plus(post_data).replace("data=", "")
-        self.log_message("post_data={}".format(post_data))
-        #root = ET.fromstring(post_data.encode('utf-8'))
+        self.log_message("post_data=%s", post_data)
         root = ET.fromstring(post_data)
-        self.log_message("tag={}".format(root.tag))
-        self.log_message("attrtib={}".format(root.attrib))
+        post_data=urllib.unquote_plus(post_data).replace("data=", "")
+        self.log_message("post_data_unquoted=%s", post_data)
+        self.log_message("tag=%s", root.tag)
+        self.log_message("attrtib=%s", root.attrib)
  
 
         for child in root:
@@ -80,31 +80,35 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
             try:
                 con = psycopg2.connect(con_str)
             except BaseException, exc:
-                self.log_error(" Exception on connect={}".format(str(exc)))
-                self.log_message(" SQL to execute=R{}".format(sql_str))
+                self.log_error(" Exception on connect=%s", str(exc))
 
             #TODO check return code
             cur = con.cursor()
+            self.log_message("SQL to execute=%s", sql_str.encode('utf-8'))
             try:
                 cur.execute(sql_str)
             except BaseException, exc:
-                self.log_error(" Exception on INSERT={}".format(str(exc)))
-                self.log_message(" SQL to execute={}".format(sql_str))
+                self.log_error(" Exception on INSERT=%s", str(exc))
             con.commit()
         
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
-    def log_message(self, a_str):
-        #t_args = tuple([a.decode('UTF-8') for a in args])
-        #t_args = repr(args).decode('utf-8')
-        #print "a_str=", a_str
-        # self.logfile.write("%s, %s - - [%s] %s\n" % 
-        self.logfile.write("{}, {} - - [{}] {}\n".format(self.address_string(), 
+    def log_message(self, format, *args):
+        loc_str = format%args
+        self.logfile.write("%s, %s - - [%s] %s\n"%
+            (self.address_string(), 
             self.client_address[0],
             self.log_date_time_string(), 
-            a_str )) 
+            loc_str.decode('utf-8')))
+            # format%args))
+        """
+        self.logfile.write("%s, %s - - [%s] %s\n".format(self.address_string(), 
+            self.client_address[0],
+            self.log_date_time_string(), 
+            a_format.format(args)))
             #a_str.encode('utf-8') )) 
+        """
 
 if __name__ == '__main__':
     # logging.basicConfig(filename='http-server.log', format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
