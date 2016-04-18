@@ -12,16 +12,45 @@ import socket
 import logging
 import sys
 import codecs
+import signal
+import requests
+
+"""
+"""
+SIGNALS_TO_NAMES_DICT = dict((getattr(signal, n), n) for n in dir(signal)
+                                     if n.startswith('SIG') and '_' not in n)
+
+def do_fake_request():
+    url_get = "http://192.168.1.101:8123/get"
+    r = requests.get(url_get)
+    # r = requests.get('http://' + HOST_NAME + ':' + str(PORT_NUMBER) +'/get')
+
+def signal_handler(asignal, frame):
+    logging.info('Got signal: %s',
+        SIGNALS_TO_NAMES_DICT.get(asignal, "Unnamed signal: %d" % asignal))
+    global do_handle 
+    do_handle = False
+    #do_fake_request()
+
+#signal.signal(signal.SIGINT, signal_handler)
+#signal.signal(signal.SIGHUP, signal_handler)
+#signal.signal(signal.SIGTERM, signal_handler)
+
+def keep_running():
+    global do_handle 
+    logging.info("Inside keep_running do_handle=%s", do_handle)
+    return do_handle 
 
 # HOST_NAME = 'ct-apps01.arc.world' # !!!REMEMBER TO CHANGE THIS!!!
 # HOST_NAME = '192.168.1.43' # !!!REMEMBER TO CHANGE THIS!!!
 HOST_NAME = socket.gethostname()
 PORT_NUMBER = 8123
+do_handle = True
 
 if HOST_NAME.find('ct-apps') > 0:
    db_host = 'vm-pg'
 else:   
-   db_host = 'vm-pg-devel1'
+   db_host = 'vm-pg-devel'
 
 glob_logname = '2can-httpd.log'
 glob_logfile = codecs.open(glob_logname, 'a', 'utf-8', buffering=0)
@@ -80,16 +109,16 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
             try:
                 con = psycopg2.connect(con_str)
             except BaseException, exc:
-                self.log_error(" Exception on connect=%s", str(exc))
-
-            #TODO check return code
-            cur = con.cursor()
-            self.log_message("SQL to execute=%s", sql_str.encode('utf-8'))
-            try:
-                cur.execute(sql_str)
-            except BaseException, exc:
-                self.log_error(" Exception on INSERT=%s", str(exc))
-            con.commit()
+                self.log_error("Exception on connect=%s", str(exc))
+            else:
+                cur = con.cursor()
+                self.log_message("SQL to execute=%s", sql_str.encode('utf-8'))
+                try:
+                    cur.execute(sql_str)
+                except BaseException, exc:
+                    self.log_error("Exception on INSERT=%s", str(exc))
+                con.commit()
+                con.close()
         
         self.send_response(200)
         self.send_header("Content-type", "text/html")
@@ -101,14 +130,7 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
             self.client_address[0],
             self.log_date_time_string(), 
             loc_str.decode('utf-8')))
-            # format%args))
-        """
-        self.logfile.write("%s, %s - - [%s] %s\n".format(self.address_string(), 
-            self.client_address[0],
-            self.log_date_time_string(), 
-            a_format.format(args)))
-            #a_str.encode('utf-8') )) 
-        """
+
 
 if __name__ == '__main__':
     # logging.basicConfig(filename='http-server.log', format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
@@ -118,8 +140,17 @@ if __name__ == '__main__':
     # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
     logging.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
     try:
-            httpd.serve_forever()
-    except KeyboardInterrupt:
-            pass
+        httpd.serve_forever()
+    except KeyboardInterrupt as exc:
+        logging.info("KeyboardInterrupt")
+    except Exception as exc:
+        #(exc_type, exc_value, exc_traceback) = sys.exc_info()
+        #logging.info("Exception type=%s, value=%s, traceback=%\n", exc_type, exc_value, "") #exc_traceback)
+        logging.info("Exception=%\n", str(exc))
+    """
+    while keep_running():
+        httpd.handle_request()
+    """
+
     httpd.server_close()
-    logging.info("Server Stops - %s:%s", HOST_NAME, PORT_NUMBER)
+    logging.info("Server Stopped - %s:%s", HOST_NAME, PORT_NUMBER)
