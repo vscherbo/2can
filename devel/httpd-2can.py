@@ -14,15 +14,13 @@ import sys
 import codecs
 import signal
 import requests
-# from daemonize import Daemonize
-import daemon
-import lockfile
+from daemon import runner
+
 
 # HOST_NAME = 'ct-apps01.arc.world' # !!!REMEMBER TO CHANGE THIS!!!
 # HOST_NAME = '192.168.1.43' # !!!REMEMBER TO CHANGE THIS!!!
 HOST_NAME = socket.gethostname()
 PORT_NUMBER = 8123
-do_handle = True
 
 if HOST_NAME.find('ct-apps') > 0:
    db_host = 'vm-pg'
@@ -30,14 +28,9 @@ else:
    db_host = 'vm-pg-devel'
 
 glob_logname = 'httpd-2can.log'
-#glob_logfile = codecs.open(glob_logname, 'a', 'utf-8', buffering=0)
 
 class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
     pg_srv = db_host
-    #logfile = glob_logfile
-    # logfile = open('2can-httpd.log', 'a', 0)
-    # def __init__(self, logfilename):
-    #    self.logfile = open(logfilename, 'a', 0)
     def do_GET(self):
         self.send_response(404)
         self.send_header('content-type','text/html')
@@ -53,7 +46,7 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
         self.log_message("post_data=%s", post_data)
         root = ET.fromstring(post_data)
         post_data=urllib.unquote_plus(post_data).replace("data=", "")
-        self.log_message("post_data_unquoted=%s", post_data)
+        # self.log_message("post_data_unquoted=%s", post_data)
         self.log_message("tag=%s", root.tag)
         self.log_message("attrtib=%s", root.attrib)
  
@@ -110,40 +103,39 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
             loc_str.decode('utf-8')))
     """
 
+class httpd2can():
 
+    def __init__(self):
+        self.stdin_path = '/dev/null'
+        self.stdout_path = '/dev/null'
+        self.stderr_path = '/dev/null'
+        self.pidfile_path =  '/smb/system/Scripts/2can/devel/http-server.pid'
+        self.pidfile_timeout = 5
+            
+    def run(self):
+        server_class = BaseHTTPServer.HTTPServer
+        httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
+        # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
+        logger.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
 
-def httpd_cleanup(signal, frame):
+        httpd.serve_forever()
+    """
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt as exc:
+            logger.info("KeyboardInterrupt")
+        except Exception as exc:
+            (exc_type, exc_value, exc_traceback) = sys.exc_info()
+            logger.info("Exception type=%s, value=%s, traceback=%s", exc_type, exc_value, exc_traceback)
+            #logger.info("Exception=%s", str(exc))
+    """
+
+def httpd_cleanup():
     #global httpd
     httpd.server_close()
     logger.info("Server Stopped - %s:%s", HOST_NAME, PORT_NUMBER)
 
-def main():
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt as exc:
-        logger.info("KeyboardInterrupt")
-    except Exception as exc:
-        #(exc_type, exc_value, exc_traceback) = sys.exc_info()
-        #logger.info("Exception type=%s, value=%s, traceback=%\n", exc_type, exc_value, "") #exc_traceback)
-        logger.info("Exception=%s", str(exc))
-
-context = daemon.DaemonContext(
-    working_directory='/smb/system/Scripts/2can/devel',
-    umask=0o002,
-    pidfile=lockfile.FileLock('/smb/system/Scripts/2can/devel/http-server.pid'),
-    )    
-
-context.signal_map = {
-    signal.SIGTERM: httpd_cleanup,
-    signal.SIGHUP: 'terminate',
-#    signal.SIGUSR1: reload_program_config,
-    }
-
-
 if __name__ == '__main__':
-
-    # logger.basicConfig(filename='http-server.log', format='%(asctime)s %(levelname)s: %(message)s', level=logger.INFO)
-    # logger.basicConfig(filename=glob_logname, format='%(asctime)s %(levelname)s: %(message)s', level=logger.INFO)
 
     logger = logging.getLogger("httpd-2can")
     logger.setLevel(logging.DEBUG)
@@ -152,14 +144,17 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    server_class = BaseHTTPServer.HTTPServer
-    httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
-    # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
-    logger.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
 
-    context.files_preserve = [handler.stream, httpd.fileno()]
-    context.stdout = handler.stream
-    context.stderr = handler.stream
+    app = httpd2can()
 
-    with context:
-       main()
+    daemon_runner = runner.DaemonRunner(app)
+    #This ensures that the logger file handle does not get closed during daemonization
+    daemon_runner.daemon_context.stdout = handler.stream
+    daemon_runner.daemon_context.stderr = handler.stream
+    daemon_runner.daemon_context.files_preserve=[handler.stream] # , httpd.fileno()]
+    daemon_runner.daemon_context.working_directory='/smb/system/Scripts/2can/devel'
+    daemon_runner.daemon_context.umask=0o002
+    # daemon_runner.action_funcs = {u'restart': <function _restart>, u'start': <function _
+    # daemon_runner.action_funcs = {u'stop': httpd_cleanup}
+    daemon_runner.do_action()
+
