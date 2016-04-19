@@ -96,7 +96,7 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
     """
     def log_message(self, format, *args):
         loc_str = format%args
-        self.logfile.write("%s, %s - - [%s] %s\n"%
+        self.server.logfile.write("%s, %s - - [%s] %s\n"%
             (self.address_string(), 
             self.client_address[0],
             self.log_date_time_string(), 
@@ -118,22 +118,18 @@ class httpd2can():
         # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
         logger.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
 
-        httpd.serve_forever()
-    """
         try:
             httpd.serve_forever()
-        except KeyboardInterrupt as exc:
-            logger.info("KeyboardInterrupt")
+        #except KeyboardInterrupt as exc:
+        #    logger.info("KeyboardInterrupt")
         except Exception as exc:
             (exc_type, exc_value, exc_traceback) = sys.exc_info()
             logger.info("Exception type=%s, value=%s, traceback=%s", exc_type, exc_value, exc_traceback)
             #logger.info("Exception=%s", str(exc))
-    """
-
-def httpd_cleanup():
-    #global httpd
-    httpd.server_close()
-    logger.info("Server Stopped - %s:%s", HOST_NAME, PORT_NUMBER)
+        finally:
+            httpd.server_close()
+            logger.info("Server Stopped - %s:%s", HOST_NAME, PORT_NUMBER)
+            
 
 if __name__ == '__main__':
 
