@@ -11,11 +11,8 @@ import psycopg2
 import socket
 import logging
 import sys
-import codecs
-import signal
-import requests
 from daemon import runner
-
+import datetime
 
 # HOST_NAME = 'ct-apps01.arc.world' # !!!REMEMBER TO CHANGE THIS!!!
 # HOST_NAME = '192.168.1.43' # !!!REMEMBER TO CHANGE THIS!!!
@@ -93,13 +90,16 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
+    def log_date_time_string(self):
+        return datetime.datetime.now()
     """
     def log_message(self, format, *args):
         loc_str = format%args
-        self.server.logfile.write("%s, %s - - [%s] %s\n"%
-            (self.address_string(), 
+        self.server.logfile = daemon_runner.daemon_context.stderr
+        self.server.logfile.write("%s, %s - - %s %s\n"%
+            (self.log_date_time_string(), 
+            self.address_string(), 
             self.client_address[0],
-            self.log_date_time_string(), 
             loc_str.decode('utf-8')))
     """
 
@@ -114,20 +114,17 @@ class httpd2can():
             
     def run(self):
         server_class = BaseHTTPServer.HTTPServer
-        httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
+        self.httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
         # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
         logger.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
 
         try:
-            httpd.serve_forever()
-        #except KeyboardInterrupt as exc:
-        #    logger.info("KeyboardInterrupt")
+            self.httpd.serve_forever()
         except Exception as exc:
             (exc_type, exc_value, exc_traceback) = sys.exc_info()
             logger.info("Exception type=%s, value=%s, traceback=%s", exc_type, exc_value, exc_traceback)
-            #logger.info("Exception=%s", str(exc))
         finally:
-            httpd.server_close()
+            self.httpd.server_close()
             logger.info("Server Stopped - %s:%s", HOST_NAME, PORT_NUMBER)
             
 
@@ -144,13 +141,11 @@ if __name__ == '__main__':
     app = httpd2can()
 
     daemon_runner = runner.DaemonRunner(app)
-    #This ensures that the logger file handle does not get closed during daemonization
     daemon_runner.daemon_context.stdout = handler.stream
     daemon_runner.daemon_context.stderr = handler.stream
-    daemon_runner.daemon_context.files_preserve=[handler.stream] # , httpd.fileno()]
+    #This ensures that the logger file handle does not get closed during daemonization
+    daemon_runner.daemon_context.files_preserve=[handler.stream]
     daemon_runner.daemon_context.working_directory='/smb/system/Scripts/2can/devel'
     daemon_runner.daemon_context.umask=0o002
-    # daemon_runner.action_funcs = {u'restart': <function _restart>, u'start': <function _
-    # daemon_runner.action_funcs = {u'stop': httpd_cleanup}
     daemon_runner.do_action()
 
