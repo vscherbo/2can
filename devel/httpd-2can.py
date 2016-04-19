@@ -14,32 +14,9 @@ import sys
 import codecs
 import signal
 import requests
-
-"""
-"""
-SIGNALS_TO_NAMES_DICT = dict((getattr(signal, n), n) for n in dir(signal)
-                                     if n.startswith('SIG') and '_' not in n)
-
-def do_fake_request():
-    url_get = "http://192.168.1.101:8123/get"
-    r = requests.get(url_get)
-    # r = requests.get('http://' + HOST_NAME + ':' + str(PORT_NUMBER) +'/get')
-
-def signal_handler(asignal, frame):
-    logging.info('Got signal: %s',
-        SIGNALS_TO_NAMES_DICT.get(asignal, "Unnamed signal: %d" % asignal))
-    global do_handle 
-    do_handle = False
-    #do_fake_request()
-
-#signal.signal(signal.SIGINT, signal_handler)
-#signal.signal(signal.SIGHUP, signal_handler)
-#signal.signal(signal.SIGTERM, signal_handler)
-
-def keep_running():
-    global do_handle 
-    logging.info("Inside keep_running do_handle=%s", do_handle)
-    return do_handle 
+# from daemonize import Daemonize
+import daemon
+import lockfile
 
 # HOST_NAME = 'ct-apps01.arc.world' # !!!REMEMBER TO CHANGE THIS!!!
 # HOST_NAME = '192.168.1.43' # !!!REMEMBER TO CHANGE THIS!!!
@@ -52,12 +29,12 @@ if HOST_NAME.find('ct-apps') > 0:
 else:   
    db_host = 'vm-pg-devel'
 
-glob_logname = '2can-httpd.log'
-glob_logfile = codecs.open(glob_logname, 'a', 'utf-8', buffering=0)
+glob_logname = 'httpd-2can.log'
+#glob_logfile = codecs.open(glob_logname, 'a', 'utf-8', buffering=0)
 
 class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
     pg_srv = db_host
-    logfile = glob_logfile
+    #logfile = glob_logfile
     # logfile = open('2can-httpd.log', 'a', 0)
     # def __init__(self, logfilename):
     #    self.logfile = open(logfilename, 'a', 0)
@@ -123,6 +100,7 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html")
         self.end_headers()
+    """
     def log_message(self, format, *args):
         loc_str = format%args
         self.logfile.write("%s, %s - - [%s] %s\n"%
@@ -130,27 +108,58 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
             self.client_address[0],
             self.log_date_time_string(), 
             loc_str.decode('utf-8')))
+    """
 
 
-if __name__ == '__main__':
-    # logging.basicConfig(filename='http-server.log', format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
-    logging.basicConfig(filename=glob_logname, format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
-    server_class = BaseHTTPServer.HTTPServer
-    httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
-    # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
-    logging.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
+
+def httpd_cleanup(signal, frame):
+    #global httpd
+    httpd.server_close()
+    logger.info("Server Stopped - %s:%s", HOST_NAME, PORT_NUMBER)
+
+def main():
     try:
         httpd.serve_forever()
     except KeyboardInterrupt as exc:
-        logging.info("KeyboardInterrupt")
+        logger.info("KeyboardInterrupt")
     except Exception as exc:
         #(exc_type, exc_value, exc_traceback) = sys.exc_info()
-        #logging.info("Exception type=%s, value=%s, traceback=%\n", exc_type, exc_value, "") #exc_traceback)
-        logging.info("Exception=%\n", str(exc))
-    """
-    while keep_running():
-        httpd.handle_request()
-    """
+        #logger.info("Exception type=%s, value=%s, traceback=%\n", exc_type, exc_value, "") #exc_traceback)
+        logger.info("Exception=%s", str(exc))
 
-    httpd.server_close()
-    logging.info("Server Stopped - %s:%s", HOST_NAME, PORT_NUMBER)
+context = daemon.DaemonContext(
+    working_directory='/smb/system/Scripts/2can/devel',
+    umask=0o002,
+    pidfile=lockfile.FileLock('/smb/system/Scripts/2can/devel/http-server.pid'),
+    )    
+
+context.signal_map = {
+    signal.SIGTERM: httpd_cleanup,
+    signal.SIGHUP: 'terminate',
+#    signal.SIGUSR1: reload_program_config,
+    }
+
+
+if __name__ == '__main__':
+
+    # logger.basicConfig(filename='http-server.log', format='%(asctime)s %(levelname)s: %(message)s', level=logger.INFO)
+    # logger.basicConfig(filename=glob_logname, format='%(asctime)s %(levelname)s: %(message)s', level=logger.INFO)
+
+    logger = logging.getLogger("httpd-2can")
+    logger.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler = logging.FileHandler(glob_logname)
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    server_class = BaseHTTPServer.HTTPServer
+    httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
+    # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
+    logger.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
+
+    context.files_preserve = [handler.stream, httpd.fileno()]
+    context.stdout = handler.stream
+    context.stderr = handler.stream
+
+    with context:
+       main()
