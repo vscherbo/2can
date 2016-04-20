@@ -20,7 +20,7 @@ HOST_NAME = socket.gethostname()
 PORT_NUMBER = 8123
 
 
-if HOST_NAME.find('ct-apps') > 0:
+if HOST_NAME.find('ct-apps') >= 0:
     db_host = 'vm-pg'
     cfg_wrk_dir = '/opt/2can'
 else:   
