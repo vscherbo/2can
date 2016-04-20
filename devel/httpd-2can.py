@@ -19,12 +19,15 @@ import datetime
 HOST_NAME = socket.gethostname()
 PORT_NUMBER = 8123
 
-if HOST_NAME.find('ct-apps') > 0:
-   db_host = 'vm-pg'
-else:   
-   db_host = 'vm-pg-devel'
 
-glob_logname = 'httpd-2can.log'
+if HOST_NAME.find('ct-apps') > 0:
+    db_host = 'vm-pg'
+    cfg_wrk_dir = '/opt/2can'
+else:   
+    db_host = 'vm-pg-devel'
+    cfg_wrk_dir = '/smb/system/Scripts/2can/devel'
+
+glob_logname = cfg_wrk_dir + '/httpd-2can.log'
 
 class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
     pg_srv = db_host
@@ -109,7 +112,7 @@ class httpd2can():
         self.stdin_path = '/dev/null'
         self.stdout_path = '/dev/null'
         self.stderr_path = '/dev/null'
-        self.pidfile_path =  '/smb/system/Scripts/2can/devel/http-server.pid'
+        self.pidfile_path =  cfg_wrk_dir + '/httpd-2can.pid'
         self.pidfile_timeout = 5
             
     def run(self):
@@ -144,8 +147,8 @@ if __name__ == '__main__':
     daemon_runner.daemon_context.stdout = handler.stream
     daemon_runner.daemon_context.stderr = handler.stream
     #This ensures that the logger file handle does not get closed during daemonization
-    daemon_runner.daemon_context.files_preserve=[handler.stream]
-    daemon_runner.daemon_context.working_directory='/smb/system/Scripts/2can/devel'
-    daemon_runner.daemon_context.umask=0o002
+    daemon_runner.daemon_context.files_preserve = [handler.stream]
+    daemon_runner.daemon_context.working_directory = cfg_wrk_dir
+    daemon_runner.daemon_context.umask = 0o002
     daemon_runner.do_action()
 
