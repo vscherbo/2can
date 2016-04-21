@@ -44,8 +44,8 @@ class HttpProcessor(BaseHTTPServer.BaseHTTPRequestHandler):
         #post_data += self.rfile.read(length).decode('utf-8')
         post_data = self.rfile.read(length)
         self.log_message("post_data=%s", post_data)
-        root = ET.fromstring(post_data)
         post_data=urllib.unquote_plus(post_data).replace("data=", "")
+        root = ET.fromstring(post_data)
         # self.log_message("post_data_unquoted=%s", post_data)
         self.log_message("tag=%s", root.tag)
         self.log_message("attrtib=%s", root.attrib)
@@ -120,6 +120,7 @@ class httpd2can():
         self.httpd = server_class((HOST_NAME, PORT_NUMBER), HttpProcessor)
         # Example SSL: httpd.socket = ssl.wrap_socket (httpd.socket, certfile='path/to/localhost.pem', server_side=True)
         logger.info("Server Starts - %s:%s", HOST_NAME, PORT_NUMBER)
+        logger.info("PG host:%s", db_host)
 
         try:
             self.httpd.serve_forever()
@@ -140,7 +141,7 @@ if __name__ == '__main__':
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-
+    # http://www.gavinj.net/2012/06/building-python-daemon-process.html
     app = httpd2can()
 
     daemon_runner = runner.DaemonRunner(app)
