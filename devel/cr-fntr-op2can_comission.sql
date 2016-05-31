@@ -5,7 +5,12 @@
 CREATE OR REPLACE FUNCTION fntr_op2can_comission()
   RETURNS trigger AS
 $BODY$BEGIN
-   NEW.Sum = NEW.Amount - ROUND(NEW.Amount * 0.0275, 2);
+   IF NEW.tag = 'Refund' THEN
+      NEW.Sum = NEW.Amount;
+   ELSE
+      NEW.Sum = NEW.Amount - ROUND(NEW.Amount * 0.0275, 2);
+   END IF;
+   
    BEGIN
       -- NEW.bill_no = (REGEXP_REPLACE(COALESCE(NEW.description,'0'), '[^0-9]+', '', 'g'))::INTEGER;
       NEW.bill_no = (REGEXP_REPLACE(NEW.description, '[^0-9]+', '', 'g'))::INTEGER;
