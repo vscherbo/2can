@@ -30,7 +30,7 @@ WITH (
 ALTER TABLE operations2can
   OWNER TO arc_energo;
 COMMENT ON TABLE operations2can
-  IS 'Уведомления от 2can об опреациях';
+  IS 'Уведомления от 2can об операциях';
 COMMENT ON COLUMN operations2can.tag IS 'Операция. В xml - это tag. Значения "Payment", "Refund" ...';
 COMMENT ON COLUMN operations2can.amount IS 'Сумма. Положительное десятичное число с фиксированной точкой, кол-во цифр после точки точно равно двум.';
 COMMENT ON COLUMN operations2can.createdat IS 'Дата создания транзакции(UTC) в Процессинге';
